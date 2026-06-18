@@ -1,0 +1,154 @@
+[
+    {
+        "id": "f6f2187d.f17ca8",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "tab_l2",
+        "type": "tab",
+        "label": "SAE23 L2",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "broker_iut",
+        "type": "mqtt-broker",
+        "name": "IUT Blagnac",
+        "broker": "mqtt.iut-blagnac.fr",
+        "port": "8883",
+        "tls": "",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "dd546567bfccb349",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": 8086,
+        "protocol": "http",
+        "database": "database",
+        "name": "",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://influxdb:8086",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "3cc11d24.ff01a2",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "WARNING: please check you have started this container with a volume that is mounted to /data\\n otherwise any flow changes are lost when you redeploy or upgrade the container\\n (e.g. upgrade to a more recent node-red docker image).\\n  If you are using named volumes you can ignore this warning.\\n Double click or see info side panel to learn how to start Node-RED in Docker to save your work",
+        "info": "\nTo start docker with a bind mount volume (-v option), for example:\n\n```\ndocker run -it -p 1880:1880 -v /home/user/node_red_data:/data --name mynodered nodered/node-red\n```\n\nwhere `/home/user/node_red_data` is a directory on your host machine where you want to store your flows.\n\nIf you do not do this then you can experiment and redploy flows, but if you restart or upgrade the container the flows will be disconnected and lost. \n\nThey will still exist in a hidden data volume, which can be recovered using standard docker techniques, but that is much more complex than just starting with a named volume as described above.",
+        "x": 350,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "mqtt_in",
+        "type": "mqtt in",
+        "z": "tab_l2",
+        "name": "Capteurs AM107",
+        "topic": "sensors/AM107/by-room/+/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "broker_iut",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 240,
+        "wires": [
+            [
+                "c099118ba6500b6c"
+            ]
+        ]
+    },
+    {
+        "id": "dbg",
+        "type": "debug",
+        "z": "tab_l2",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 710,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "c099118ba6500b6c",
+        "type": "function",
+        "z": "tab_l2",
+        "name": "Extraction mesures",
+        "func": "// MQTT payload is an array: [ measurements, metadata ]\nvar data = msg.payload;\nif (!Array.isArray(data) || data.length < 2) { return null; }\nvar m = data[0];      // measurements\nvar meta = data[1];   // device metadata\n\n// Keep only the numeric measurements we want\nvar fields = {};\nif (m.temperature !== undefined) { fields.temperature = m.temperature; }\nif (m.humidity !== undefined)    { fields.humidity = m.humidity; }\nif (m.co2 !== undefined)         { fields.co2 = m.co2; }\nif (m.illumination !== undefined){ fields.illumination = m.illumination; }\n\n// Tags identify the sensor location\nvar tags = { room: meta.room || \"unknown\", building: meta.Building || \"unknown\" };\n\n// InfluxDB \"out\" node expects [ fields, tags ]\nmsg.payload = [fields, tags];\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 240,
+        "wires": [
+            [
+                "5875af3329e95d43",
+                "dbg"
+            ]
+        ]
+    },
+    {
+        "id": "5875af3329e95d43",
+        "type": "influxdb out",
+        "z": "tab_l2",
+        "influxdb": "dd546567bfccb349",
+        "name": "influxdb",
+        "measurement": "releve",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "iut",
+        "bucket": "capteurs",
+        "x": 720,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "9c9989fa78ddb7d2",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-influxdb": "0.7.0"
+        }
+    }
+]
