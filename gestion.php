@@ -1,17 +1,17 @@
 <?php
 // ============================================================
-//  Manager page (protected): measurements of THEIR building,
-//  with min / max / average, last 10 measures, and a filter.
+//  Manager page (protected): min/max/avg, last 10, filter + chart
 // ============================================================
 require 'db.php';
 require 'auth.php';
-exiger_role('gestionnaire');          // managers only
+exiger_role('gestionnaire');
 
 $title   = "Gestion";
 $id_gest = intval($_SESSION['id_gestionnaire']);
 include 'header.php';
-
-// Buildings managed by this manager
+?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<?php
 $resBat = mysqli_query($db, "SELECT nom FROM Batiment WHERE id_gestionnaire = $id_gest");
 $batNoms = array();
 while ($b = mysqli_fetch_assoc($resBat)) { $batNoms[] = $b['nom']; }
@@ -104,7 +104,6 @@ if (isset($_GET['capteur'])) {
     $debut = mysqli_real_escape_string($db, $_GET['debut']);
     $fin   = mysqli_real_escape_string($db, $_GET['fin']);
 
-    // Security: make sure this sensor belongs to the manager's building
     $check = mysqli_query($db, "SELECT c.id_capteur FROM Capteur c
                                 JOIN Salle s ON c.id_salle = s.id_salle
                                 JOIN Batiment b ON s.id_batiment = b.id_batiment
@@ -114,12 +113,34 @@ if (isset($_GET['capteur'])) {
               WHERE id_capteur = $idc AND date_mesure BETWEEN '$debut' AND '$fin'
               ORDER BY date_mesure, heure_mesure";
         $r = mysqli_query($db, $q);
+        $labels = array(); $vals = array();
         echo "<h3>Mesures du capteur (".mysqli_num_rows($r)." résultat(s))</h3>";
         echo "<table><tr><th>Date</th><th>Heure</th><th>Valeur</th></tr>";
         while ($m = mysqli_fetch_assoc($r)) {
             echo "<tr><td>".htmlspecialchars($m['date_mesure'])."</td><td>".htmlspecialchars($m['heure_mesure'])."</td><td>".htmlspecialchars($m['valeur'])."</td></tr>";
+            $labels[] = $m['date_mesure']." ".substr($m['heure_mesure'],0,5);
+            $vals[]   = floatval($m['valeur']);
         }
         echo "</table>";
+        if (count($vals) > 0) {
+            echo '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 6px 24px rgba(15,23,42,.07);margin-top:14px;"><canvas id="courbe" height="110"></canvas></div>';
+            echo '<script>
+            new Chart(document.getElementById("courbe"), {
+              type: "line",
+              data: {
+                labels: '.json_encode($labels).',
+                datasets: [{
+                  label: "Valeur",
+                  data: '.json_encode($vals).',
+                  borderColor: "#2563eb",
+                  backgroundColor: "rgba(37,99,235,.12)",
+                  fill: true, tension: .3, pointRadius: 2
+                }]
+              },
+              options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+            </script>';
+        }
     } else {
         echo "<div class='error'>Ce capteur ne fait pas partie de votre bâtiment.</div>";
     }
